@@ -24,6 +24,8 @@ const analysisColumns = ['内容主题', '目标人群', '用户需求', '内容
 const analysisTableColumns = ['笔记标题', ...analysisColumns]
 const ANALYSIS_STORAGE_KEY = 'insurance_content_analysis_v1'
 const DATASET_STORAGE_KEY = 'insurance_content_rows_v1'
+// 公开生产构建（Vercel）禁用 AI 重新分析，避免暴露 /api/analyze 后端调用
+const IS_PUBLIC_DEMO = import.meta.env.PROD
 const COMBINATION_GROUPS = [
   { key: 'audience-need', label: '目标人群 × 用户需求', left: '目标人群', right: '用户需求', template: (left, right) => `面向【${left}】人群，围绕【${right}】需求的内容，在当前样本中表现高于整体基准。` },
   { key: 'need-hook', label: '用户需求 × 标题钩子', left: '用户需求', right: '标题钩子', template: (left, right) => `围绕【${left}】需求，采用【${right}】标题钩子的内容，在当前样本中表现高于整体基准。` },
@@ -302,7 +304,7 @@ function App() {
   }
 
   const handleAnalyze = async (retryOnly = false) => {
-    if (analysisRunning) return
+    if (IS_PUBLIC_DEMO || analysisRunning) return
     const targetIndexes = rows.map((row, index) => ({ row, index })).filter(({ row, index }) => {
       if (retryOnly && !failedIndexes.includes(index)) return false
       return !hasAnalysisResult(row)
@@ -444,8 +446,14 @@ function App() {
           </div>
           <div className="analysis-actions">
             {analysisMessage && <span className="analysis-message">{analysisMessage.split('\n').map((line) => <span key={line}>{line}<br /></span>)}</span>}
-            <button className="analysis-button" type="button" disabled={analysisRunning} onClick={() => handleAnalyze(false)}>{analysisRunning ? 'AI分析中...' : '开始AI分析'}</button>
-            {!analysisRunning && failedIndexes.length > 0 && <button className="retry-button" type="button" onClick={() => handleAnalyze(true)}>仅重试失败项（{failedIndexes.length}）</button>}
+            {IS_PUBLIC_DEMO ? (
+              <span className="analysis-message">在线 Demo 暂不开放 AI 重新分析，当前展示为已完成分析的研究样本。</span>
+            ) : (
+              <>
+                <button className="analysis-button" type="button" disabled={analysisRunning} onClick={() => handleAnalyze(false)}>{analysisRunning ? 'AI分析中...' : '开始AI分析'}</button>
+                {!analysisRunning && failedIndexes.length > 0 && <button className="retry-button" type="button" onClick={() => handleAnalyze(true)}>仅重试失败项（{failedIndexes.length}）</button>}
+              </>
+            )}
           </div>
         </div>
         <div className="table-frame analysis-table-frame">
