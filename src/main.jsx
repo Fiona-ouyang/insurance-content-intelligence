@@ -141,6 +141,23 @@ function saveRawDataset(rows) {
   }
 }
 
+function getEngagementScore(row) {
+  return (Number(row['点赞数']) || 0) + (Number(row['收藏数']) || 0) + (Number(row['评论数']) || 0)
+}
+
+// 优先高表现样本，同类再按互动量排序，取前 3 条用于 OpportunityCard 展示
+function getRepresentativeNotes(tagRows) {
+  return [...tagRows]
+    .sort((left, right) => {
+      const leftHigh = left['样本类型'] === '高表现' ? 1 : 0
+      const rightHigh = right['样本类型'] === '高表现' ? 1 : 0
+      if (leftHigh !== rightHigh) return rightHigh - leftHigh
+      return getEngagementScore(right) - getEngagementScore(left)
+    })
+    .slice(0, 3)
+    .map((row) => ({ 笔记标题: row['笔记标题'], 笔记链接: row['笔记链接'], 点赞数: row['点赞数'], 收藏数: row['收藏数'] }))
+}
+
 function calculateOpportunityStats(rows, dimension) {
   const validRows = rows.filter((row) => row['样本类型'] === '高表现' || row['样本类型'] === '普通')
   const baselineHighRate = validRows.length ? validRows.filter((row) => row['样本类型'] === '高表现').length / validRows.length : 0
@@ -159,7 +176,7 @@ function calculateOpportunityStats(rows, dimension) {
     const highRate = tag.sampleCount ? tag.highCount / tag.sampleCount : 0
     const supplyRate = validRows.length ? tag.sampleCount / validRows.length : 0
     const performanceLift = highRate - baselineHighRate
-    return { ...tag, highRate, supplyRate, performanceLift, opportunityScore: performanceLift * (1 - supplyRate) }
+    return { ...tag, highRate, supplyRate, performanceLift, opportunityScore: performanceLift * (1 - supplyRate), representativeNotes: getRepresentativeNotes(tag.rows) }
   })
   const sortedSupplyRates = tags.map((tag) => tag.supplyRate).sort((left, right) => left - right)
   const middle = Math.floor(sortedSupplyRates.length / 2)
@@ -585,7 +602,7 @@ function OpportunityCard({ candidate, baselineHighRate }) {
   return <article className="opportunity-card">
     <div className="candidate-title"><h4>{candidate.label}</h4><span>潜在内容机会</span></div>
     <div className="candidate-metrics"><div><small>高表现率</small><strong>{(candidate.highRate * 100).toFixed(1)}%</strong></div><div><small>整体基准</small><strong>{(baselineHighRate * 100).toFixed(1)}%</strong></div><div><small>样本数</small><strong>{candidate.sampleCount}</strong></div><div><small>内容供给率</small><strong>{(candidate.supplyRate * 100).toFixed(1)}%</strong></div><div><small>相对基准</small><strong>{candidate.performanceLift >= 0 ? '+' : ''}{(candidate.performanceLift * 100).toFixed(1)}pct</strong></div><div><small>机会指数</small><strong>{candidate.opportunityScore.toFixed(3)}</strong></div></div>
-    <div className="representative-notes"><small>代表内容</small>{candidate.representativeNotes.map((row, index) => <div key={`${row['笔记标题']}-${index}`}><span>{row['笔记链接'] && row['笔记链接'] !== '—' ? <a href={row['笔记链接']} target="_blank" rel="noreferrer">{row['笔记标题']}</a> : row['笔记标题']}</span><em>{formatNumber(row['点赞数'])} 赞 · {formatNumber(row['收藏数'])} 藏</em></div>)}</div>
+    <div className="representative-notes"><small>代表内容</small>{(candidate.representativeNotes || []).map((row, index) => <div key={`${row['笔记标题']}-${index}`}><span>{row['笔记链接'] && row['笔记链接'] !== '—' ? <a href={row['笔记链接']} target="_blank" rel="noreferrer">{row['笔记标题']}</a> : row['笔记标题']}</span><em>{formatNumber(row['点赞数'])} 赞 · {formatNumber(row['收藏数'])} 藏</em></div>)}</div>
   </article>
 }
 
