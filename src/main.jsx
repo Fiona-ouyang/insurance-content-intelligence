@@ -379,19 +379,7 @@ function App() {
         <div className="hero-index">01 <span>/</span> CONTENT DB</div>
       </section>
 
-      <section className="upload-panel">
-        <div className="upload-icon">↑</div>
-        <div className="upload-copy">
-          <strong>导入竞品内容数据</strong>
-          <span>支持 .xlsx / .xls / .csv，数据将在浏览器本地解析</span>
-          {isDemoDataset && <small>当前展示：保险赛道内容研究 Demo · {rows.length} 篇样本</small>}
-          {fileName && <small>{fileName} · {message}</small>}
-          {message && !fileName && <small className="error-message">{message}</small>}
-        </div>
-        <button className="upload-button" type="button" onClick={() => fileInputRef.current?.click()}>选择文件</button>
-        <button className="clear-project-button" type="button" onClick={clearProjectData}>清空项目数据</button>
-        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(event) => handleFile(event.target.files?.[0])} />
-      </section>
+      {isDemoDataset && <div className="status-indicator demo-status-indicator"><span /> 当前展示：保险赛道内容研究 Demo · {rows.length} 篇样本</div>}
 
       <section className="stats-grid" aria-label="基础统计">
         <StatCard label="竞品账号数" value={stats.accounts} suffix="个" />
@@ -403,6 +391,24 @@ function App() {
         <StatCard label="总样本" value={stats.totalSample} suffix="篇" />
         <StatCard label="高表现" value={stats.highPerformance} suffix="篇" />
         <StatCard label="普通" value={stats.ordinary} suffix="篇" />
+      </section>
+
+      <InsightsSection insightDimension={insightDimension} setInsightDimension={setInsightDimension} insightStats={insightStats} />
+      <OpportunityMatrixSection insightDimension={insightDimension} setInsightDimension={setInsightDimension} opportunityStats={opportunityStats} />
+      <CrossDimensionOpportunities stats={crossDimensionStats} />
+      <CombinationOpportunities stats={combinationStats} />
+
+      <section className="upload-panel">
+        <div className="upload-icon">↑</div>
+        <div className="upload-copy">
+          <strong>导入竞品内容数据</strong>
+          <span>支持 .xlsx / .xls / .csv，数据将在浏览器本地解析</span>
+          {fileName && <small>{fileName} · {message}</small>}
+          {message && !fileName && <small className="error-message">{message}</small>}
+        </div>
+        <button className="upload-button" type="button" onClick={() => fileInputRef.current?.click()}>选择文件</button>
+        <button className="clear-project-button" type="button" onClick={clearProjectData}>清空项目数据</button>
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={(event) => handleFile(event.target.files?.[0])} />
       </section>
 
       <section className="database-section">
@@ -469,11 +475,6 @@ function App() {
         </div>
         <p className="table-note">共 {filteredRows.length} 条待分析内容 · AI标签覆盖：{analysisCoverage} / {rows.length}</p>
       </section>
-
-      <InsightsSection insightDimension={insightDimension} setInsightDimension={setInsightDimension} insightStats={insightStats} />
-      <OpportunityMatrixSection insightDimension={insightDimension} setInsightDimension={setInsightDimension} opportunityStats={opportunityStats} />
-      <CrossDimensionOpportunities stats={crossDimensionStats} />
-      <CombinationOpportunities stats={combinationStats} />
     </main>
   )
 }
