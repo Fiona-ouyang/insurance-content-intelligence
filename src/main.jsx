@@ -54,9 +54,9 @@ const seedRows = [
 const accountColors = ['coral', 'blue', 'green', 'gold', 'violet']
 const NAV_ITEMS = [
   { key: 'overview', label: '首页概览', icon: 'home', description: '核心指标与内容表现概览' },
+  { key: 'opportunities', label: '选题发现', icon: 'opportunities', description: '查看机会矩阵与可测试方向' },
   { key: 'analysis', label: '内容分析', icon: 'analysis', description: '查看笔记 AI 标签分析结果' },
   { key: 'accounts', label: '账号对比', icon: 'accounts', description: '按账号筛选并查看原始笔记指标' },
-  { key: 'opportunities', label: '选题发现', icon: 'opportunities', description: '查看机会矩阵与可测试方向' },
   { key: 'insights', label: '标签洞察', icon: 'insights', description: '切换七个标签维度观察表现' },
   { key: 'notes', label: '笔记列表', icon: 'notes', description: '筛选与浏览研究样本' },
   { key: 'import', label: '数据导入', icon: 'import', description: '导入 Excel 或 CSV 研究数据' },
@@ -646,13 +646,45 @@ function AnalysisModule({ rows, analysisCoverage, totalRows, analysisMessage, an
   </section>
 }
 
+const OPPORTUNITY_ADVICE = {
+  内容主题: (label) => `可以围绕「${label}」主题再做几篇不同切入角度的选题，观察表现是否延续。`,
+  目标人群: (label) => `可以用更贴近「${label}」的表达和场景补充选题，观察该人群内容的后续反馈。`,
+  用户需求: (label) => `可以针对「${label}」这一需求设计几篇直接回应的笔记，与现有内容做对照。`,
+  内容类型: (label) => `可以把已有选题改写为「${label}」形式，对比同选题不同形式的表现。`,
+  内容场景: (label) => `可以增加「${label}」场景的选题，验证这类场景是否值得持续投入。`,
+  标题钩子: (label) => `可以在同一选题下试用「${label}」标题写法，与现有标题做对照测试。`,
+  内容目的: (label) => `可以尝试增加以「${label}」为目标的内容，再观察表现变化。`,
+}
+
 function OpportunityModule({ insightDimension, setInsightDimension, opportunityStats, crossDimensionStats, combinationStats }) {
+  const allCandidates = useMemo(() => crossDimensionStats.flatMap(({ dimension, candidates }) => candidates.map((candidate) => ({ ...candidate, dimension }))).sort((left, right) => right.opportunityScore - left.opportunityScore), [crossDimensionStats])
   return <div className="module-content opportunity-module">
-    <div className="module-heading"><div><p className="section-kicker">内容方向研究</p><h1>选题发现</h1><p>基于现有七维标签与样本表现，查看机会矩阵、跨维度机会和内容组合。</p></div></div>
+    <div className="module-heading"><div><p className="section-kicker">内容方向研究</p><h1>选题发现</h1><p>基于现有七维标签与样本表现，先看核心机会，再查看矩阵、排行和内容组合。</p></div></div>
+    <CoreInsights stats={crossDimensionStats} candidates={allCandidates} />
     <OpportunityMatrixSection insightDimension={insightDimension} setInsightDimension={setInsightDimension} opportunityStats={opportunityStats} />
-    <CrossDimensionOpportunities stats={crossDimensionStats} />
+    <CrossDimensionOpportunities candidates={allCandidates} baselineHighRate={crossDimensionStats[0]?.baselineHighRate || 0} />
     <CombinationOpportunities stats={combinationStats} />
   </div>
+}
+
+function CoreInsights({ stats, candidates }) {
+  const top = candidates.slice(0, 3)
+  const baselineHighRate = stats[0]?.baselineHighRate || 0
+  return <section className="core-insights">
+    <div className="section-heading insights-heading"><div><p className="section-kicker">CORE INSIGHTS</p><h2>核心机会洞察</h2><p className="opportunity-subtitle">从 7 个标签维度中统一筛选「低供给 × 高表现」的候选方向</p></div></div>
+    <div className="core-summary">
+      <div><small>扫描维度</small><strong>{stats.length}<em>个</em></strong></div>
+      <div><small>有效标签</small><strong>{stats.reduce((sum, item) => sum + item.tags.length, 0)}</strong></div>
+      <div><small>候选机会</small><strong>{candidates.length}</strong></div>
+      <div><small>整体高表现率</small><strong>{(baselineHighRate * 100).toFixed(1)}%</strong></div>
+    </div>
+    {top.length ? <div className="core-grid">{top.map((item, index) => <article className="core-card" key={`${item.dimension}-${item.label}`}>
+      <div className="core-card-head"><span className="core-rank">{index + 1}</span><div><small>{item.dimension}</small><h3>{item.dimension}：{item.label}</h3></div></div>
+      <div className="core-metrics"><div><small>样本量</small><b>{item.sampleCount}</b></div><div><small>高表现篇数</small><b>{item.highCount}</b></div><div><small>高表现率</small><b>{(item.highRate * 100).toFixed(1)}%</b></div><div><small>相对整体基准</small><b className="positive-rate">+{(item.performanceLift * 100).toFixed(1)}pct</b></div></div>
+      <p className="core-advice"><b>运营建议</b>{(OPPORTUNITY_ADVICE[item.dimension] || ((label) => `可以围绕「${label}」设计后续测试选题。`))(item.label)}</p>
+    </article>)}</div> : <p className="empty-state opportunity-empty">当前样本中没有同时满足「样本量 ≥ 3、高表现率高于整体基准、供给率低于中位数」的标签，因此暂时没有候选方向。</p>}
+    <p className="insight-note">以上结论仅基于当前研究样本，属于待验证的候选方向，建议仅作为后续测试的参考，不代表已验证的效果。</p>
+  </section>
 }
 
 function ImportModule({ fileInputRef, fileName, message, handleFile, clearProjectData }) {
@@ -761,16 +793,12 @@ function OpportunityMatrixSection({ insightDimension, setInsightDimension, oppor
     </div>
     <MatrixChart tags={tags} candidates={candidates} baselineHighRate={baselineHighRate} medianSupply={medianSupply} maxSupply={maxSupply} />
     <p className="matrix-reading-note">阅读说明：横轴为内容供给率，纵轴为高表现率；左上象限代表低供给、高表现的候选机会，实际选题仍需结合样本量及后续测试判断。</p>
-    <div className="opportunity-candidates">
-      <div className="section-heading candidate-heading"><div><p className="section-kicker">CANDIDATE DIRECTIONS</p><h3>潜在内容机会</h3></div><span className="result-count">最多展示 5 个</span></div>
-      {hasCandidates ? <div className="candidate-grid">{candidates.map((candidate) => <OpportunityCard key={candidate.label} candidate={candidate} baselineHighRate={baselineHighRate} />)}</div> : <p className="empty-state opportunity-empty">当前样本中暂未发现同时满足低供给与高表现条件的标签。</p>}
-    </div>
-    <p className="insight-note">机会指数仅用于当前样本内部排序。机会矩阵基于当前 {validRows.length} 篇研究样本的相对表现与内容供给计算，用于发现候选测试方向。样本为研究样本而非全平台随机样本，结果不代表小红书整体内容分布或因果关系。</p>
+    <p className={`matrix-status ${hasCandidates ? '' : 'is-empty'}`}>{hasCandidates ? `当前维度有 ${candidates.length} 个候选方向（粉色圆点），详情见下方「候选机会排行榜」。` : `当前维度暂无符合条件的候选方向：没有标签同时满足「样本量 ≥ 3、高表现率高于整体基准、供给率低于中位数」。可切换其他维度查看。`}</p>
   </section>
 }
 
 const MATRIX_W = 1000
-const MATRIX_H = 560
+const MATRIX_H = 440
 const MATRIX_PAD = { left: 76, right: 130, top: 34, bottom: 66 }
 
 function placeMatrixLabels(points, plot) {
@@ -852,26 +880,14 @@ function MatrixChart({ tags, candidates, baselineHighRate, medianSupply, maxSupp
   </div>
 }
 
-function OpportunityCard({ candidate, baselineHighRate }) {
-  return <article className="opportunity-card">
-    <div className="candidate-title"><h4>{candidate.label}</h4><span>潜在内容机会</span></div>
-    <div className="candidate-metrics"><div><small>高表现率</small><strong>{(candidate.highRate * 100).toFixed(1)}%</strong></div><div><small>整体基准</small><strong>{(baselineHighRate * 100).toFixed(1)}%</strong></div><div><small>样本数</small><strong>{candidate.sampleCount}</strong></div><div><small>内容供给率</small><strong>{(candidate.supplyRate * 100).toFixed(1)}%</strong></div><div><small>相对基准</small><strong>{candidate.performanceLift >= 0 ? '+' : ''}{(candidate.performanceLift * 100).toFixed(1)}pct</strong></div><div><small>机会指数</small><strong>{candidate.opportunityScore.toFixed(3)}</strong></div></div>
-    <div className="representative-notes"><small>代表内容</small>{(candidate.representativeNotes || []).map((row, index) => <div key={`${row['笔记标题']}-${index}`}><span>{row['笔记链接'] && row['笔记链接'] !== '—' ? <a href={row['笔记链接']} target="_blank" rel="noreferrer">{row['笔记标题']}</a> : row['笔记标题']}</span><em>{formatNumber(row['点赞数'])} 赞 · {formatNumber(row['收藏数'])} 藏</em></div>)}</div>
-  </article>
-}
-
-function CrossDimensionOpportunities({ stats }) {
-  const validRows = stats[0]?.validRows || []
-  const baselineHighRate = stats[0]?.baselineHighRate || 0
-  const allCandidates = stats.flatMap(({ dimension, candidates }) => candidates.map((candidate) => ({ ...candidate, dimension }))).sort((left, right) => right.opportunityScore - left.opportunityScore).slice(0, 10)
+function CrossDimensionOpportunities({ candidates, baselineHighRate }) {
+  const ranked = candidates.slice(0, 10)
   return <section className="cross-opportunity-section">
-    <div className="section-heading insights-heading"><div><p className="section-kicker">CROSS-DIMENSION OPPORTUNITIES</p><h2>跨维度机会发现</h2><p className="opportunity-subtitle">从7个内容维度中统一筛选「低供给 × 高表现」候选方向</p></div></div>
-    <div className="cross-summary"><StatCard label="扫描维度" value={stats.length} suffix="个" /><StatCard label="有效标签" value={stats.reduce((sum, item) => sum + item.tags.length, 0)} /><StatCard label="候选机会" value={stats.reduce((sum, item) => sum + item.candidates.length, 0)} /><StatCard label="整体高表现率" value={`${(baselineHighRate * 100).toFixed(1)}%`} /></div>
+    <div className="section-heading insights-heading"><div><p className="section-kicker">OPPORTUNITY RANKING</p><h2>候选机会排行榜</h2><p className="opportunity-subtitle">按机会指数排序；相对基准 = 该标签高表现率 − 整体基准 {(baselineHighRate * 100).toFixed(1)}%</p></div><span className="result-count">最多展示 10 个</span></div>
     <div className="cross-content">
-      <div className="cross-ranking"><div className="section-heading candidate-heading"><div><p className="section-kicker">OPPORTUNITY RANKING</p><h3>候选机会排行榜</h3></div><span className="result-count">最多展示 10 个</span></div>{allCandidates.length ? <div className="ranking-list">{allCandidates.map((candidate, index) => <div className="ranking-row" key={`${candidate.dimension}-${candidate.label}`}><strong className="ranking-number">{String(index + 1).padStart(2, '0')}</strong><span className="ranking-dimension">{candidate.dimension}</span><b>{candidate.label}</b><span>样本 {candidate.sampleCount}</span><span>高表现 {candidate.highCount}</span><span>{(candidate.supplyRate * 100).toFixed(1)}%</span><span>{(candidate.highRate * 100).toFixed(1)}%</span><span className="positive-rate">+{(candidate.performanceLift * 100).toFixed(1)}pct</span><strong>{candidate.opportunityScore.toFixed(3)}</strong></div>)}</div> : <p className="empty-state opportunity-empty">暂无符合当前标准的候选方向</p>}</div>
-      <div className="dimension-overview"><div className="section-heading candidate-heading"><div><p className="section-kicker">DIMENSION OVERVIEW</p><h3>维度概览</h3></div></div>{stats.map((item) => { const best = [...item.candidates].sort((left, right) => right.opportunityScore - left.opportunityScore)[0]; return <div className="dimension-card" key={item.dimension}><b>{item.dimension}</b><span>标签 {item.tags.length} · 候选 {item.candidates.length}</span><small>{best ? `最高机会指数：${best.label} · ${best.opportunityScore.toFixed(3)}` : '暂无候选'}</small></div> })}</div>
+      <div className="cross-ranking">{ranked.length ? <div className="ranking-list"><div className="ranking-row ranking-head"><span>排名</span><span>维度</span><span>标签</span><span>样本量</span><span>高表现</span><span>供给率</span><span>高表现率</span><span>相对基准</span><span>机会指数</span></div>{ranked.map((candidate, index) => <div className="ranking-row" key={`${candidate.dimension}-${candidate.label}`}><strong className="ranking-number">{String(index + 1).padStart(2, '0')}</strong><span className="ranking-dimension">{candidate.dimension}</span><b>{candidate.label}</b><span>{candidate.sampleCount}</span><span>{candidate.highCount}</span><span>{(candidate.supplyRate * 100).toFixed(1)}%</span><span>{(candidate.highRate * 100).toFixed(1)}%</span><span className="positive-rate">+{(candidate.performanceLift * 100).toFixed(1)}pct</span><strong>{candidate.opportunityScore.toFixed(3)}</strong></div>)}</div> : <p className="empty-state opportunity-empty">暂无符合当前标准的候选方向</p>}</div>
     </div>
-    <p className="insight-note">该结果基于当前研究样本内部的相对供给与表现差异，用于生成后续内容测试假设，不代表平台整体内容供给，也不代表因果关系。</p>
+    <p className="insight-note">机会指数仅用于当前样本内部排序。结果基于研究样本内部的相对供给与表现差异，用于生成后续内容测试假设，不代表平台整体内容供给，也不代表因果关系。</p>
   </section>
 }
 
